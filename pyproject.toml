@@ -1,6 +1,6 @@
 [project]
 name = "krea2-training-free-improvements"
-version = "0.1.0"
+version = "0.1.1"
 description = "Composable training-free GAG and NAG guidance for Krea2 in ComfyUI."
 license = { file = "LICENSE" }
 dependencies = []

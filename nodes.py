@@ -78,11 +78,11 @@ class Krea2GeometryAwareAttentionGuidance:
                 ),
                 "sigma_start": (
                     "FLOAT",
-                    {"default": 1000.0, "min": 0.0, "max": 1000.0, "step": 0.1},
+                    {"default": 1000.0, "min": 0.0, "max": 1000.0, "step": 0.001},
                 ),
                 "sigma_end": (
                     "FLOAT",
-                    {"default": 0.0, "min": 0.0, "max": 1000.0, "step": 0.1},
+                    {"default": 0.0, "min": 0.0, "max": 1000.0, "step": 0.001},
                 ),
             }
         }
@@ -132,11 +132,11 @@ class Krea2NAGNegativePrompt:
                 ),
                 "sigma_start": (
                     "FLOAT",
-                    {"default": 1000.0, "min": 0.0, "max": 1000.0, "step": 0.1},
+                    {"default": 1000.0, "min": 0.0, "max": 1000.0, "step": 0.001},
                 ),
                 "sigma_end": (
                     "FLOAT",
-                    {"default": 0.0, "min": 0.0, "max": 1000.0, "step": 0.1},
+                    {"default": 0.0, "min": 0.0, "max": 1000.0, "step": 0.001},
                 ),
             }
         }
