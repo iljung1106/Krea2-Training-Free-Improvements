@@ -1,7 +1,7 @@
 [project]
 name = "krea2-training-free-improvements"
-version = "0.1.1"
-description = "Composable training-free GAG and NAG guidance for Krea2 in ComfyUI."
+version = "0.3.0"
+description = "Composable Krea2 guidance and acceleration nodes, including GAG, NAG, Prompt Reinjection, TaylorSeer, and adaptive progressive sampling."
 license = { file = "LICENSE" }
 dependencies = []
 

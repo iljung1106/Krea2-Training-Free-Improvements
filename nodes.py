@@ -6,7 +6,16 @@ from functools import partial
 import comfy.patcher_extension
 from comfy.ldm.krea2.model import SingleStreamDiT
 
-from .krea2_guidance import GAGState, GuidanceState, NAGState, guidance_wrapper
+from .adaptive_resolution import Krea2AdaptiveProgressiveSampler
+from .krea2_guidance import (
+    GAGState,
+    GuidanceState,
+    NAGState,
+    PromptReinjectionState,
+    TaylorRuntime,
+    TaylorSeerState,
+    guidance_wrapper,
+)
 
 
 ATTACHMENT_KEY = "krea2_training_free_improvements_state"
@@ -66,7 +75,7 @@ class Krea2GeometryAwareAttentionGuidance:
                 "model": ("MODEL",),
                 "guidance_scale": (
                     "FLOAT",
-                    {"default": 10.0, "min": 0.0, "max": 30.0, "step": 0.1},
+                    {"default": 5.0, "min": 0.0, "max": 30.0, "step": 0.1},
                 ),
                 "eta": (
                     "FLOAT",
@@ -74,15 +83,15 @@ class Krea2GeometryAwareAttentionGuidance:
                 ),
                 "strength": (
                     "FLOAT",
-                    {"default": 1.0, "min": 0.0, "max": 1.0, "step": 0.01},
+                    {"default": 0.6, "min": 0.0, "max": 1.0, "step": 0.01},
                 ),
                 "sigma_start": (
                     "FLOAT",
-                    {"default": 1000.0, "min": 0.0, "max": 1000.0, "step": 0.001},
+                    {"default": 0.881, "min": 0.0, "max": 1000.0, "step": 0.001},
                 ),
                 "sigma_end": (
                     "FLOAT",
-                    {"default": 0.0, "min": 0.0, "max": 1000.0, "step": 0.001},
+                    {"default": 0.678, "min": 0.0, "max": 1000.0, "step": 0.001},
                 ),
             }
         }
@@ -166,12 +175,121 @@ class Krea2NAGNegativePrompt:
         return _install(model, replace(_state(model), nag=nag))
 
 
+class Krea2PromptReinjection:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "model": ("MODEL",),
+                "origin_layer": (
+                    "INT",
+                    {"default": 1, "min": 0, "max": 27, "step": 1},
+                ),
+                "target_start": (
+                    "INT",
+                    {"default": 2, "min": 0, "max": 27, "step": 1},
+                ),
+                "target_end": (
+                    "INT",
+                    {"default": 27, "min": 0, "max": 27, "step": 1},
+                ),
+                "weight": (
+                    "FLOAT",
+                    {"default": 0.025, "min": -1.0, "max": 1.0, "step": 0.001},
+                ),
+                "anchoring": ("BOOLEAN", {"default": False}),
+            }
+        }
+
+    RETURN_TYPES = ("MODEL",)
+    RETURN_NAMES = ("model",)
+    FUNCTION = "patch"
+    CATEGORY = "Krea2 Training Free Improvements/guidance"
+    DESCRIPTION = (
+        "Reinjects shallow prompt features into deeper Krea2 text tokens to reduce "
+        "prompt forgetting. Defaults follow the official recommendation for a new MMDiT."
+    )
+
+    def patch(self, model, origin_layer, target_start, target_end, weight, anchoring):
+        _validate_krea2(model)
+        if not 0 <= origin_layer < 28:
+            raise ValueError("origin_layer must be in [0, 27].")
+        if not origin_layer < target_start <= target_end < 28:
+            raise ValueError(
+                "Prompt Reinjection requires origin_layer < target_start <= target_end < 28."
+            )
+        reinjection = PromptReinjectionState(
+            origin_layer=int(origin_layer),
+            target_start=int(target_start),
+            target_end=int(target_end),
+            weight=float(weight),
+            anchoring=bool(anchoring),
+        )
+        return _install(
+            model, replace(_state(model), prompt_reinjection=reinjection)
+        )
+
+
+class Krea2TaylorSeer:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "model": ("MODEL",),
+                "warmup_steps": (
+                    "INT",
+                    {"default": 3, "min": 2, "max": 100, "step": 1},
+                ),
+                "fresh_interval": (
+                    "INT",
+                    {"default": 2, "min": 2, "max": 100, "step": 1},
+                ),
+                "tail_full_steps": (
+                    "INT",
+                    {"default": 2, "min": 0, "max": 100, "step": 1},
+                ),
+                "max_order": (
+                    "INT",
+                    {"default": 0, "min": 0, "max": 2, "step": 1},
+                ),
+            }
+        }
+
+    RETURN_TYPES = ("MODEL",)
+    RETURN_NAMES = ("model",)
+    FUNCTION = "patch"
+    CATEGORY = "Krea2 Training Free Improvements/acceleration"
+    DESCRIPTION = (
+        "TaylorSeer Lite for Krea2. It forecasts one final model output between periodic "
+        "full refreshes, skipping all transformer blocks with only a tiny cache. "
+        "Euler/simple is recommended; increase fresh_interval for more speed at a "
+        "larger quality cost. Order 0 is the tested 10-step Krea2 Turbo default."
+    )
+
+    def patch(self, model, warmup_steps, fresh_interval, tail_full_steps, max_order):
+        _validate_krea2(model)
+        taylorseer = TaylorSeerState(
+            warmup_steps=int(warmup_steps),
+            fresh_interval=int(fresh_interval),
+            tail_full_steps=int(tail_full_steps),
+            max_order=int(max_order),
+            runtime=TaylorRuntime(),
+        )
+        return _install(model, replace(_state(model), taylorseer=taylorseer))
+
+
 NODE_CLASS_MAPPINGS = {
     "Krea2GeometryAwareAttentionGuidance": Krea2GeometryAwareAttentionGuidance,
     "Krea2NAGNegativePrompt": Krea2NAGNegativePrompt,
+    "Krea2PromptReinjection": Krea2PromptReinjection,
+    "Krea2TaylorSeer": Krea2TaylorSeer,
+    "Krea2AdaptiveProgressiveSampler": Krea2AdaptiveProgressiveSampler,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "Krea2GeometryAwareAttentionGuidance": "Krea2 Geometry-Aware Attention Guidance",
     "Krea2NAGNegativePrompt": "Krea2 NAG Negative Prompt",
+    "Krea2PromptReinjection": "Krea2 Prompt Reinjection",
+    "Krea2TaylorSeer": "Krea2 TaylorSeer Lite",
+    "Krea2AdaptiveProgressiveSampler": "Krea2 Adaptive Progressive Sampler",
 }
