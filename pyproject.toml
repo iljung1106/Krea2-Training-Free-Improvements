@@ -1,0 +1,14 @@
+[project]
+name = "krea2-training-free-improvements"
+version = "0.1.0"
+description = "Composable training-free GAG and NAG guidance for Krea2 in ComfyUI."
+license = { file = "LICENSE" }
+dependencies = []
+
+[project.urls]
+Repository = "https://github.com/iljung1106/Krea2-Training-Free-Improvements"
+"Bug Tracker" = "https://github.com/iljung1106/Krea2-Training-Free-Improvements/issues"
+
+[tool.comfy]
+PublisherId = "iljung1106"
+DisplayName = "Krea2 Training Free Improvements"
